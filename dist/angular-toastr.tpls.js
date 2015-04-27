@@ -2,7 +2,7 @@
   'use strict';
 
   angular.module('toastr', [])
-    .factory('toastr', toastr);
+      .factory('toastr', toastr);
 
   toastr.$inject = ['$animate', '$injector', '$document', '$rootScope', '$sce', 'toastrConfig', '$q'];
 
@@ -10,6 +10,7 @@
     var container;
     var index = 0;
     var toasts = [];
+    var checkTargetDelay = 250;
 
     var previousToastMessage = '';
 
@@ -114,22 +115,31 @@
       return angular.extend({}, toastrConfig);
     }
 
+    function _getTarget(options) {
+      var defferred = $q.defer();
+      var targetElement;
+      var intervalId = setInterval(function () {
+        targetElement = angular.element(document.querySelector(options.target));
+
+        if (targetElement.length) {
+          clearInterval(intervalId);
+          return defferred.resolve(targetElement);
+        }
+      }, checkTargetDelay);
+
+      return defferred.promise;
+    }
+
     function _createOrGetContainer(options) {
       if(container) { return containerDefer.promise; }
 
-      container = angular.element('<div></div>');
-      container.attr('id', options.containerId);
-      container.addClass(options.positionClass);
-      container.css({'pointer-events': 'auto'});
+      _getTarget(options).then(function (target) {
+        container = angular.element('<div></div>');
+        container.attr('id', options.containerId);
+        container.addClass(options.positionClass);
+        container.css({'pointer-events': 'auto'});
 
-      var target = angular.element(document.querySelector(options.target));
-
-      if ( ! target || ! target.length) {
-        throw 'Target for toasts doesn\'t exist';
-      }
-
-      $animate.enter(container, target).then(function() {
-        containerDefer.resolve();
+        $animate.enter(container, target).then(containerDefer.resolve);
       });
 
       return containerDefer.promise;
@@ -214,7 +224,7 @@
 
         function cleanOptionsOverride(options) {
           var badOptions = ['containerId', 'iconClasses', 'maxOpened', 'newestOnTop',
-                            'positionClass', 'preventDuplicates', 'templates'];
+            'positionClass', 'preventDuplicates', 'templates'];
           for (var i = 0, l = badOptions.length; i < l; i++) {
             delete options[badOptions[i]];
           }
@@ -225,7 +235,7 @@
 
       function createToastEl(scope) {
         var angularDomEl = angular.element('<div toast></div>'),
-          $compile = $injector.get('$compile');
+            $compile = $injector.get('$compile');
         return $compile(angularDomEl)(scope);
       }
 
@@ -281,58 +291,6 @@
       titleClass: 'toast-title',
       toastClass: 'toast'
     });
-}());
-
-(function() {
-  'use strict';
-
-  angular.module('toastr')
-    .directive('progressBar', progressBar);
-
-  progressBar.$inject = ['toastrConfig'];
-
-  function progressBar(toastrConfig) {
-    return {
-      replace: true,
-      require: '^toast',
-      templateUrl: function() {
-        return toastrConfig.templates.progressbar;
-      },
-      link: linkFunction
-    };
-
-    function linkFunction(scope, element, attrs, toastCtrl) {
-      var intervalId, currentTimeOut, hideTime;
-
-      toastCtrl.progressBar = scope;
-
-      scope.start = function(duration) {
-        if (intervalId) {
-          clearInterval(intervalId);
-        }
-
-        currentTimeOut = parseFloat(duration);
-        hideTime = new Date().getTime() + currentTimeOut;
-        intervalId = setInterval(updateProgress, 10);
-      };
-
-      scope.stop = function() {
-        if (intervalId) {
-          clearInterval(intervalId);
-        }
-      };
-
-      function updateProgress() {
-        var percentage = ((hideTime - (new Date().getTime())) / currentTimeOut) * 100;
-        element.css('width', percentage + '%');
-      }
-
-      scope.$on('$destroy', function() {
-        // Failsafe stop
-        clearInterval(intervalId);
-      });
-    }
-  }
 }());
 
 (function() {
@@ -447,5 +405,57 @@
   }
 }());
 
-angular.module("toastr").run(["$templateCache", function($templateCache) {$templateCache.put("directives/progressbar/progressbar.html","<div class=\"toast-progress\"></div>\n");
-$templateCache.put("directives/toast/toast.html","<div class=\"{{toastClass}} {{toastType}}\" ng-click=\"tapToast()\">\n  <div ng-switch on=\"allowHtml\">\n    <div ng-switch-default ng-if=\"title\" class=\"{{titleClass}}\">{{title}}</div>\n    <div ng-switch-default class=\"{{messageClass}}\">{{message}}</div>\n    <div ng-switch-when=\"true\" ng-if=\"title\" class=\"{{titleClass}}\" ng-bind-html=\"title\"></div>\n    <div ng-switch-when=\"true\" class=\"{{messageClass}}\" ng-bind-html=\"message\"></div>\n  </div>\n  <progress-bar ng-if=\"progressBar\"></progress-bar>\n</div>\n");}]);
+(function() {
+  'use strict';
+
+  angular.module('toastr')
+    .directive('toastrProgressBar', progressBar);
+
+  progressBar.$inject = ['toastrConfig'];
+
+  function progressBar(toastrConfig) {
+    return {
+      replace: true,
+      require: '^toast',
+      templateUrl: function() {
+        return toastrConfig.templates.progressbar;
+      },
+      link: linkFunction
+    };
+
+    function linkFunction(scope, element, attrs, toastCtrl) {
+      var intervalId, currentTimeOut, hideTime;
+
+      toastCtrl.progressBar = scope;
+
+      scope.start = function(duration) {
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+
+        currentTimeOut = parseFloat(duration);
+        hideTime = new Date().getTime() + currentTimeOut;
+        intervalId = setInterval(updateProgress, 10);
+      };
+
+      scope.stop = function() {
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      };
+
+      function updateProgress() {
+        var percentage = ((hideTime - (new Date().getTime())) / currentTimeOut) * 100;
+        element.css('width', percentage + '%');
+      }
+
+      scope.$on('$destroy', function() {
+        // Failsafe stop
+        clearInterval(intervalId);
+      });
+    }
+  }
+}());
+
+angular.module("toastr").run(["$templateCache", function($templateCache) {$templateCache.put("directives/progressbar/progressbar.html","<div class=\"toast-progress\"></div>\r\n");
+$templateCache.put("directives/toast/toast.html","<div class=\"{{toastClass}} {{toastType}}\" ng-click=\"tapToast()\">\r\n  <div ng-switch on=\"allowHtml\">\r\n    <div ng-switch-default ng-if=\"title\" class=\"{{titleClass}}\">{{title}}</div>\r\n    <div ng-switch-default class=\"{{messageClass}}\">{{message}}</div>\r\n    <div ng-switch-when=\"true\" ng-if=\"title\" class=\"{{titleClass}}\" ng-bind-html=\"title\"></div>\r\n    <div ng-switch-when=\"true\" class=\"{{messageClass}}\" ng-bind-html=\"message\"></div>\r\n  </div>\r\n  <toastr-progress-bar ng-if=\"progressBar\"></toastr-progress-bar>\r\n</div>\r\n");}]);

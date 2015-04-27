@@ -2,7 +2,7 @@
   'use strict';
 
   angular.module('toastr', [])
-    .factory('toastr', toastr);
+      .factory('toastr', toastr);
 
   toastr.$inject = ['$animate', '$injector', '$document', '$rootScope', '$sce', 'toastrConfig', '$q'];
 
@@ -10,6 +10,7 @@
     var container;
     var index = 0;
     var toasts = [];
+    var checkTargetDelay = 250;
 
     var previousToastMessage = '';
 
@@ -114,22 +115,31 @@
       return angular.extend({}, toastrConfig);
     }
 
+    function _getTarget(options) {
+      var defferred = $q.defer();
+      var targetElement;
+      var intervalId = setInterval(function () {
+        targetElement = angular.element(document.querySelector(options.target));
+
+        if (targetElement.length) {
+          clearInterval(intervalId);
+          return defferred.resolve(targetElement);
+        }
+      }, checkTargetDelay);
+
+      return defferred.promise;
+    }
+
     function _createOrGetContainer(options) {
       if(container) { return containerDefer.promise; }
 
-      container = angular.element('<div></div>');
-      container.attr('id', options.containerId);
-      container.addClass(options.positionClass);
-      container.css({'pointer-events': 'auto'});
+      _getTarget(options).then(function (target) {
+        container = angular.element('<div></div>');
+        container.attr('id', options.containerId);
+        container.addClass(options.positionClass);
+        container.css({'pointer-events': 'auto'});
 
-      var target = angular.element(document.querySelector(options.target));
-
-      if ( ! target || ! target.length) {
-        throw 'Target for toasts doesn\'t exist';
-      }
-
-      $animate.enter(container, target).then(function() {
-        containerDefer.resolve();
+        $animate.enter(container, target).then(containerDefer.resolve);
       });
 
       return containerDefer.promise;
@@ -214,7 +224,7 @@
 
         function cleanOptionsOverride(options) {
           var badOptions = ['containerId', 'iconClasses', 'maxOpened', 'newestOnTop',
-                            'positionClass', 'preventDuplicates', 'templates'];
+            'positionClass', 'preventDuplicates', 'templates'];
           for (var i = 0, l = badOptions.length; i < l; i++) {
             delete options[badOptions[i]];
           }
@@ -225,7 +235,7 @@
 
       function createToastEl(scope) {
         var angularDomEl = angular.element('<div toast></div>'),
-          $compile = $injector.get('$compile');
+            $compile = $injector.get('$compile');
         return $compile(angularDomEl)(scope);
       }
 

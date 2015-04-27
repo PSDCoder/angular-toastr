@@ -2,7 +2,7 @@
   'use strict';
 
   angular.module('toastr')
-    .directive('progressBar', progressBar);
+    .directive('toastrProgressBar', progressBar);
 
   progressBar.$inject = ['toastrConfig'];
 
